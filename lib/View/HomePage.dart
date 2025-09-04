@@ -5,6 +5,7 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:window_manager/window_manager.dart';
 import '../model/booking.dart';
 import '../services/booking_service.dart';
+import '../services/device_service.dart';
 import 'RoomDetailPage.dart';
 import 'package:intl/intl.dart';
 import 'Scanme/ScanPage.dart';
@@ -31,6 +32,8 @@ class _HomePageState extends State<HomePage> {
   int _logoTapCount = 0;
   Timer? _tapResetTimer;
   final BookingService bookingService = BookingService();
+  String deviceLocation = "Loading...";
+  final DeviceService deviceService = DeviceService();
 
   Route<T> _noAnimationRoute<T>(Widget page) {
     return PageRouteBuilder<T>(
@@ -65,13 +68,16 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     _enableKioskMode();
     _listenBookings();
+    _fetchDeviceLocation();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _updateLeftCardHeight();
     });
+
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       setState(() {
         _currentTime = DateTime.now();
         _updateAvailability();
+        _updateBookingStatus();
       });
     });
   }
@@ -84,6 +90,13 @@ class _HomePageState extends State<HomePage> {
         bookings = list;
         _updateAvailability();
       });
+    });
+  }
+
+  Future<void> _fetchDeviceLocation() async {
+    final location = await deviceService.getLocation(widget.roomName);
+    setState(() {
+      deviceLocation = location;
     });
   }
 
@@ -153,6 +166,37 @@ class _HomePageState extends State<HomePage> {
       if (_currentTime.isAfter(start) && _currentTime.isBefore(end)) {
         isAvailable = false;
         break;
+      }
+    }
+  }
+
+  void _updateBookingStatus() async {
+    final now = DateTime.now();
+
+    for (var b in List<Booking>.from(bookings)) { // copy biar aman saat remove
+      final parts = b.time.split(':');
+      final start = DateTime(
+        int.parse(b.date.split('/')[2]),
+        int.parse(b.date.split('/')[1]),
+        int.parse(b.date.split('/')[0]),
+        int.parse(parts[0]),
+        int.parse(parts[1]),
+      );
+      final dur = int.tryParse(b.duration ?? '30') ?? 30;
+      final end = start.add(Duration(minutes: dur));
+
+      if (now.isAfter(end)) {
+        Booking bookingToMove = b;
+
+        if (b.id.isEmpty) {
+          final saved = await bookingService.saveBooking(b);
+          bookingToMove = saved;
+        }
+
+        await bookingService.moveToHistory(bookingToMove);
+        setState(() {
+          bookings.remove(b);
+        });
       }
     }
   }
@@ -410,8 +454,15 @@ class _HomePageState extends State<HomePage> {
                                                         );
 
                                                         if (shouldEnd == true) {
-                                                          await bookingService.deleteBooking(booking.id);
-                                                          Fluttertoast.showToast(msg: "Event ended and removed");
+                                                          final bookingWithId = booking.id.isEmpty
+                                                              ? booking.copyWith(id: booking.id)
+                                                              : booking;
+
+                                                          await bookingService.moveToHistory(bookingWithId);
+                                                          Fluttertoast.showToast(msg: "Event ended");
+                                                          setState(() {
+                                                            bookings.remove(booking);
+                                                          });
                                                         }
                                                       },
                                                     ),

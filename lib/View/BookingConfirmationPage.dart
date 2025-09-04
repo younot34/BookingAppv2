@@ -54,7 +54,8 @@ class BookingConfirmationPage extends StatelessWidget {
         const SnackBar(content: Text("successfully")),
       );
 
-      Navigator.popUntil(context, (route) => route.isFirst);
+      Navigator.pop(context);
+      Navigator.pop(context);
     } catch (e) {
       Navigator.of(context, rootNavigator: true).pop();
       ScaffoldMessenger.of(context).showSnackBar(

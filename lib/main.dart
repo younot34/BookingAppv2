@@ -1,7 +1,7 @@
-import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:testing/services/room_service.dart';
 import 'View/HomePage.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -9,12 +9,10 @@ import 'firebase_options.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final configString = await rootBundle.loadString("assets/config.json");
-  final config = jsonDecode(configString);
-  final roomName = config["roomName"] ?? "Room 001";
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  final roomName = await RoomService.getOrRegisterRoom();
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: []);
   if (Platform.isWindows) {
     await setupWindow();

@@ -1,7 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class Booking {
-  final String id;  final String roomName;
+  final String id;  
+  final String roomName;
   final String date;
   final String time;
   final String? duration;
@@ -11,6 +12,7 @@ class Booking {
   final String meetingTitle;
   final bool isScanEnabled;
   final String? scanInfo;
+  final String status;
 
   Booking({
     required this.id,
@@ -24,6 +26,7 @@ class Booking {
     required this.meetingTitle,
     this.isScanEnabled = false,
     this.scanInfo,
+    this.status = "upcoming",
   });
 
   factory Booking.newBooking({
@@ -65,6 +68,7 @@ class Booking {
       "meetingTitle": meetingTitle,
       "isScanEnabled": isScanEnabled,
       "scanInfo": scanInfo,
+      "status": status,
     };
   }
 
@@ -82,40 +86,34 @@ class Booking {
       meetingTitle: data["meetingTitle"] ?? "",
       isScanEnabled: data["isScanEnabled"] ?? false,
       scanInfo: data["scanInfo"],
+      status: data["status"] ?? "upcoming",
     );
   }
-  Booking copyWith({String? id}) {
+  Booking copyWith({
+    String? id,
+    String? roomName,
+    String? date,
+    String? time,
+    String? duration,
+    int? numberOfPeople,
+    List<String>? equipment,
+    String? hostName,
+    String? meetingTitle,
+    bool? isScanEnabled,
+    String? scanInfo,
+  }) {
     return Booking(
       id: id ?? this.id,
-      roomName: roomName,
-      date: date,
-      time: time,
-      duration: duration,
-      numberOfPeople: numberOfPeople,
-      equipment: equipment,
-      hostName: hostName,
-      meetingTitle: meetingTitle,
-      isScanEnabled: isScanEnabled,
-      scanInfo: scanInfo,
+      roomName: roomName ?? this.roomName,
+      date: date ?? this.date,
+      time: time ?? this.time,
+      duration: duration ?? this.duration,
+      numberOfPeople: numberOfPeople ?? this.numberOfPeople,
+      equipment: equipment ?? this.equipment,
+      hostName: hostName ?? this.hostName,
+      meetingTitle: meetingTitle ?? this.meetingTitle,
+      isScanEnabled: isScanEnabled ?? this.isScanEnabled,
+      scanInfo: scanInfo ?? this.scanInfo,
     );
   }
 }
-
-//kalau butuh history
-// void _removePastBookings() {
-//   bookings.removeWhere((b) {
-//     final parts = b.time.split(':');
-//     final hour = int.parse(parts[0]);
-//     final minute = int.parse(parts[1]);
-//     final start = DateTime(
-//       int.parse(b.date.split('/')[2]),
-//       int.parse(b.date.split('/')[1]),
-//       int.parse(b.date.split('/')[0]),
-//       hour,
-//       minute,
-//     );
-//     final dur = int.tryParse(b.duration ?? '30') ?? 30;
-//     final end = start.add(Duration(minutes: dur));
-//     return end.isBefore(_currentTime);
-//   });
-// }
