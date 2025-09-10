@@ -4,6 +4,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 
+import '../model/device.dart';
+
 class DeviceService {
   final CollectionReference _collection =
   FirebaseFirestore.instance.collection("devices");
@@ -64,5 +66,40 @@ class DeviceService {
         return "Unknown Location";
       }
     });
+  }
+  final CollectionReference devices =
+  FirebaseFirestore.instance.collection('devices');
+  Future<Device?> getDeviceByRoom(String roomName) async {
+    final snapshot = await devices
+        .where('roomName', isEqualTo: roomName)
+        .limit(1)
+        .get();
+
+    if (snapshot.docs.isNotEmpty) {
+      return Device.fromFirestore(snapshot.docs.first);
+    }
+    return null;
+  }
+  Future<void> setDeviceStatus(String roomName, bool isOn) async {
+    try {
+      final snapshot = await devices
+          .where('roomName', isEqualTo: roomName)
+          .limit(1)
+          .get();
+
+      if (snapshot.docs.isNotEmpty) {
+        final docId = snapshot.docs.first.id;
+        await devices.doc(docId).update({'isOn': isOn});
+      } else {
+        // Kalau device belum ada, buat baru
+        await devices.add({
+          'roomName': roomName,
+          'isOn': isOn,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
+    } catch (e) {
+      print("Failed to update status: $e");
+    }
   }
 }

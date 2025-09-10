@@ -53,25 +53,25 @@ class BookingService {
     await _collection.doc(id).delete();
   }
 
-  Future<void> moveToHistory(Booking booking) async {
-    try {
-      if (booking.id.isEmpty) {
-        print("Booking ID kosong, tidak bisa dipindah ke history.");
-        return;
-      }
-
-      print("🚀 Memindahkan booking '${booking.meetingTitle}' ke history...");
-
-      // Simpan booking ke collection history
-      await _historyCollection.doc(booking.id).set(booking.toMap());
-      print("✅ Booking tersimpan di history dengan ID: ${booking.id}");
-
-      // Hapus dari collection bookings
-      await _collection.doc(booking.id).delete();
-      print("🗑 Booking dihapus dari bookings.");
-
-    } catch (e) {
-      print("❌ Gagal memindahkan booking ke history: $e");
-    }
-  }
+  // Future<void> moveToHistory(Booking booking) async {
+  //   try {
+  //     if (booking.id.isEmpty) {
+  //       print("Booking ID kosong, tidak bisa dipindah ke history.");
+  //       return;
+  //     }
+  //
+  //     print("🚀 Memindahkan booking '${booking.meetingTitle}' ke history...");
+  //
+  //     // Simpan booking ke collection history
+  //     await _historyCollection.doc(booking.id).set(booking.toMap());
+  //     print("✅ Booking tersimpan di history dengan ID: ${booking.id}");
+  //
+  //     // Hapus dari collection bookings
+  //     await _collection.doc(booking.id).delete();
+  //     print("🗑 Booking dihapus dari bookings.");
+  //
+  //   } catch (e) {
+  //     print("❌ Gagal memindahkan booking ke history: $e");
+  //   }
+  // }
 }

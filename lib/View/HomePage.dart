@@ -6,6 +6,9 @@ import 'package:window_manager/window_manager.dart';
 import '../model/booking.dart';
 import '../services/booking_service.dart';
 import '../services/device_service.dart';
+import '../services/media_service.dart';
+import '../services/room_service.dart';
+import 'Logo.dart';
 import 'RoomDetailPage.dart';
 import 'package:intl/intl.dart';
 import 'Scanme/ScanPage.dart';
@@ -19,7 +22,7 @@ class HomePage extends StatefulWidget {
   _HomePageState createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with WidgetsBindingObserver{
   bool isScanEnabled = false;
   bool isAvailable = true;
   late Timer _timer;
@@ -32,8 +35,22 @@ class _HomePageState extends State<HomePage> {
   int _logoTapCount = 0;
   Timer? _tapResetTimer;
   final BookingService bookingService = BookingService();
-  String deviceLocation = "Loading...";
   final DeviceService deviceService = DeviceService();
+  int? roomCapacity;
+  String? roomLocation;
+  String? logoUrlMain;
+  String? logoUrlSub;
+  final DeviceService _deviceService = DeviceService();
+
+  Future<void> _loadMediaLogos() async {
+    final mediaList = await MediaService().getAllMedia(); // ambil semua media
+    if (mediaList.isNotEmpty) {
+      setState(() {
+        logoUrlMain = mediaList[0].logoUrl; // logo utama
+        logoUrlSub = mediaList[0].subLogoUrl; // sub logo
+      });
+    }
+  }
 
   Route<T> _noAnimationRoute<T>(Widget page) {
     return PageRouteBuilder<T>(
@@ -66,9 +83,11 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _enableKioskMode();
     _listenBookings();
-    _fetchDeviceLocation();
+    _fetchDeviceData();
+    _loadMediaLogos();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _updateLeftCardHeight();
     });
@@ -80,6 +99,7 @@ class _HomePageState extends State<HomePage> {
         _updateBookingStatus();
       });
     });
+    _deviceService.setDeviceStatus(widget.roomName, true);
   }
 
   void _listenBookings() {
@@ -93,11 +113,19 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  Future<void> _fetchDeviceLocation() async {
-    final location = await deviceService.getLocation(widget.roomName);
-    setState(() {
-      deviceLocation = location;
-    });
+  Future<void> _fetchDeviceData() async {
+    final device = await deviceService.getDeviceByRoom(widget.roomName);
+    if (device != null) {
+      setState(() {
+        roomCapacity = device.capacity;
+        roomLocation = device.location;
+      });
+    } else {
+      setState(() {
+        roomCapacity = null;
+        roomLocation = "Unknown";
+      });
+    }
   }
 
   Future<void> _enableKioskMode() async {
@@ -186,14 +214,6 @@ class _HomePageState extends State<HomePage> {
       final end = start.add(Duration(minutes: dur));
 
       if (now.isAfter(end)) {
-        Booking bookingToMove = b;
-
-        if (b.id.isEmpty) {
-          final saved = await bookingService.saveBooking(b);
-          bookingToMove = saved;
-        }
-
-        await bookingService.moveToHistory(bookingToMove);
         setState(() {
           bookings.remove(b);
         });
@@ -249,40 +269,25 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Widget buildLogo(String? assetPath, {double? width, double? height}) {
-    if (assetPath == null || assetPath.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    return GestureDetector(
-      onTap: () async {
-        _logoTapCount++;
-        _tapResetTimer?.cancel();
-        _tapResetTimer = Timer(const Duration(seconds: 2), () {
-          _logoTapCount = 0;
-        });
-        if (_logoTapCount >= 10) {
-          _logoTapCount = 0;
-          _tapResetTimer?.cancel();
-          await _disableKioskMode();
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("App unpinned")),
-          );
-        }
-      },
-      child: Image.asset(
-        assetPath,
-        width: width,
-        height: height,
-        fit: BoxFit.contain,
-      ),
-    );
-  }
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _timer.cancel();
     _bookingSubscription.cancel();
+    _deviceService.setDeviceStatus(widget.roomName, false);
     super.dispose();
   }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _deviceService.setDeviceStatus(widget.roomName, true); // balik ON
+    } else if (state == AppLifecycleState.detached ||
+        state == AppLifecycleState.inactive) {
+      _deviceService.setDeviceStatus(widget.roomName, false); // jadi OFF
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final current = currentMeeting;
@@ -392,19 +397,19 @@ class _HomePageState extends State<HomePage> {
                                           style: const TextStyle(
                                               fontSize: 22, fontWeight: FontWeight.bold),),
                                         const SizedBox(height: 10),
-                                        const Row(
+                                        Row(
                                           children: [
-                                            Icon(Icons.people_alt, size: 20),
-                                            SizedBox(width: 6),
-                                            Text("Capacity: 20 people"),
+                                            const Icon(Icons.people_alt, size: 20),
+                                            const SizedBox(width: 6),
+                                            Text("Capacity: ${roomCapacity ?? '-'} people"),
                                           ],
                                         ),
                                         const SizedBox(height: 6),
-                                        const Row(
+                                        Row(
                                           children: [
-                                            Icon(Icons.location_on, size: 20),
-                                            SizedBox(width: 6),
-                                            Text("Floor 3, East Wing"),
+                                            const Icon(Icons.location_on, size: 20),
+                                            const SizedBox(width: 6),
+                                            Text(roomLocation ?? 'Loading...'),
                                           ],
                                         ),
                                         const SizedBox(height: 20),
@@ -458,7 +463,6 @@ class _HomePageState extends State<HomePage> {
                                                               ? booking.copyWith(id: booking.id)
                                                               : booking;
 
-                                                          await bookingService.moveToHistory(bookingWithId);
                                                           Fluttertoast.showToast(msg: "Event ended");
                                                           setState(() {
                                                             bookings.remove(booking);
@@ -499,29 +503,9 @@ class _HomePageState extends State<HomePage> {
                                                 const SizedBox(height: 10),
                                                 if (current.equipment.isNotEmpty)
                                                   Wrap(
-                                                    spacing: 12,
+                                                    spacing: 8,
                                                     children: current.equipment.map((e) {
-                                                      IconData iconData;
-                                                      switch (e) {
-                                                        case "Laptop":
-                                                          iconData = Icons.laptop_mac;
-                                                          break;
-                                                        case "HP":
-                                                          iconData = Icons.phone_android;
-                                                          break;
-                                                        case "Video Conference":
-                                                          iconData = Icons.videocam;
-                                                          break;
-                                                        case "Tablet":
-                                                          iconData = Icons.tablet;
-                                                          break;
-                                                        case "Board":
-                                                          iconData = Icons.tab_outlined;
-                                                          break;
-                                                        default:
-                                                          iconData = Icons.device_unknown;
-                                                      }
-                                                      return Icon(iconData, size: 28, color: Colors.black54);
+                                                      return Chip(label: Text(e));
                                                     }).toList(),
                                                   ),
                                               ],
@@ -552,21 +536,55 @@ class _HomePageState extends State<HomePage> {
                   const SizedBox(height: 30,),
                   Column(
                     children: [
+                      const SizedBox(height: 30),
                       CircleAvatar(
                         radius: 40,
                         backgroundColor: Colors.grey[800],
                         child: ClipOval(
-                          child: buildLogo(
-                            "assets/logo.png",
+                          child:
+                          LogoWidget(
+                            imageUrlOrBase64: logoUrlMain,
                             width: 70,
                             height: 70,
-                          ),
+                            onTap: () async {
+                              _logoTapCount++;
+                              _tapResetTimer?.cancel();
+                              _tapResetTimer = Timer(const Duration(seconds: 2), () {
+                                _logoTapCount = 0;
+                              });
+                              if (_logoTapCount >= 10) {
+                                _logoTapCount = 0;
+                                _tapResetTimer?.cancel();
+                                await _disableKioskMode();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text("App unpinned")),
+                                );
+                              }
+                            },
+                          )
                         ),
                       ),
-                      Padding(
-                        padding: const EdgeInsets.all(12.0),
-                        child: buildLogo("assets/logo2.png", width: 150, height: 30),
-                      ),
+                      const SizedBox(height: 12),
+                      LogoWidget(
+                        imageUrlOrBase64: logoUrlSub,
+                        width: 150,
+                        height: 30,
+                        onTap: () async {
+                          _logoTapCount++;
+                          _tapResetTimer?.cancel();
+                          _tapResetTimer = Timer(const Duration(seconds: 2), () {
+                            _logoTapCount = 0;
+                          });
+                          if (_logoTapCount >= 10) {
+                            _logoTapCount = 0;
+                            _tapResetTimer?.cancel();
+                            await _disableKioskMode();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text("App unpinned")),
+                            );
+                          }
+                        },
+                      )
                     ],
                   ),
                   const SizedBox(height: 15),

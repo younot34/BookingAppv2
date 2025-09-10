@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:table_calendar/table_calendar.dart';
@@ -42,19 +43,39 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
   final List<int> durations = [30, 45, 60, 90, 120, 150, 180, 210];
   List<String> hours = [];
   List<String> minutes = [];
-  final List<String> equipments = [
-    "Laptop",
-    "HP",
-    "Video Conference",
-    "Tablet",
-    "Board"
-  ];
+  int? capacity;
+  List<String> equipment = [];
   final Map<String, IconData> equipmentIcons = {
-    "Laptop": Icons.laptop_mac,
-    "HP": Icons.phone_android,
+    "Meja": Icons.table_bar,
+    "Kursi": Icons.chair,
+    "Whiteboard": Icons.border_color,
+    "Flipchart": Icons.edit_note,
+    "Microphone": Icons.mic,
+    "Speaker": Icons.speaker,
+    "Sound System": Icons.surround_sound,
+    "Headset": Icons.headset,
+    "Proyektor": Icons.present_to_all,
+    "Layar Proyektor": Icons.theaters,
+    "TV": Icons.tv,
     "Video Conference": Icons.videocam,
+    "Laptop": Icons.laptop_mac,
+    "PC": Icons.computer,
     "Tablet": Icons.tablet,
-    "Board": Icons.tab_outlined,
+    "HP": Icons.phone_android,
+    "Printer": Icons.print,
+    "WiFi": Icons.wifi,
+    "LAN": Icons.settings_ethernet,
+    "HDMI": Icons.cable,
+    "Charger": Icons.power,
+    "AC": Icons.ac_unit,
+    "Lampu": Icons.light,
+    "Jam": Icons.access_time,
+    "Tirai": Icons.window,
+    "Remote": Icons.settings_remote,
+    "Name Tag": Icons.badge,
+    "Air Minum": Icons.local_drink,
+    "Snack": Icons.fastfood,
+    "Dokumen": Icons.folder,
   };
   List<String> get visibleTimes {
     final available = getAvailableTimes(selectedDate);
@@ -82,6 +103,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
       selectedTime = "$selectedHour:$selectedMinute";
     }
     WidgetsBinding.instance.addPostFrameCallback((_) => _getCalendarHeight());
+    _loadDeviceData();
   }
   void _getCalendarHeight() {
     final renderBox = _calendarKey.currentContext?.findRenderObject() as RenderBox?;
@@ -102,7 +124,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
     );
     final checkEnd = checkTime.add(Duration(minutes: selectedDur));
     if (checkTime.isBefore(DateTime.now())) return false;
-    const minBufferMinutes = 5;
+    const minBufferMinutes = 30;
     if (widget.existingBookings != null) {
       for (var b in widget.existingBookings!) {
         if (b.date == "${selectedDate.day}/${selectedDate.month}/${selectedDate.year}") {
@@ -112,9 +134,9 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
           final bookedDur = int.tryParse(b.duration ?? '30') ?? 30;
           final bookedStart = DateTime(selectedDate.year, selectedDate.month, selectedDate.day, bookedHour, bookedMinute);
           final bookedEnd = bookedStart.add(Duration(minutes: bookedDur));
+          // buffer sebelum & sesudah booking
           final bufferStart = bookedStart.subtract(const Duration(minutes: minBufferMinutes));
-          final bufferEnd = bookedEnd;
-
+          final bufferEnd = bookedEnd.add(const Duration(minutes: minBufferMinutes));
           if (checkTime.isBefore(bufferEnd) && checkEnd.isAfter(bufferStart)) {
             return false;
           }
@@ -142,18 +164,44 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
             final duration = int.tryParse(b.duration ?? '30') ?? 30;
             final bookedStart = DateTime(date.year, date.month, date.day, bookedHour, bookedMinute);
             final bookedEnd = bookedStart.add(Duration(minutes: duration));
-            if (!checkTime.isBefore(bookedStart) && checkTime.isBefore(bookedEnd)) {
+
+            // buffer sebelum & sesudah booking
+            final bufferStart = bookedStart.subtract(const Duration(minutes: 30));
+            final bufferEnd = bookedEnd.add(const Duration(minutes: 30));
+
+            if (checkTime.isAfter(bufferStart) && checkTime.isBefore(bufferEnd)) {
               conflict = true;
               break;
             }
           }
         }
       }
+
       if (!conflict && isSelectedTimeValid(hour.toString().padLeft(2, '0'), minute.toString().padLeft(2, '0'))) {
         available.add(t);
       }
     }
     return available;
+  }
+  Future<void> _loadDeviceData() async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('devices')
+        .where('roomName', isEqualTo: widget.roomName)
+        .limit(1)
+        .get();
+
+    if (snapshot.docs.isNotEmpty) {
+      final data = snapshot.docs.first.data();
+      setState(() {
+        capacity = data['capacity'];
+        equipment = List<String>.from(data['equipment'] ?? []);
+      });
+    }else {
+      setState(() {
+        capacity = 0;
+        equipment = [];
+      });
+    }
   }
   Future<String?> _showScanInfoDialog() async {
     final controller = TextEditingController(text: scanInfo);
@@ -398,17 +446,13 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                   isExpanded: true,
                   hint: const Text("Minute"),
                   value: selectedMinute,
-                  items: minutes.map((m) {
-                    final disabled = selectedHour != null && !isSelectedTimeValid(selectedHour!, m);
-                    return DropdownMenuItem(
-                      value: m,
-                      enabled: !disabled,
-                      child: Text(
-                        m,
-                        style: TextStyle(color: disabled ? Colors.grey : Colors.black),
-                      ),
-                    );
-                  }).toList(),
+                  items: minutes
+                      .where((m) => selectedHour == null || isSelectedTimeValid(selectedHour!, m))
+                      .map((m) => DropdownMenuItem(
+                    value: m,
+                    child: Text(m),
+                  ))
+                      .toList(),
                   onChanged: (value) {
                     if (value == null) return;
                     setState(() {
@@ -460,6 +504,9 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
     );
   }
   Widget buildNumberOfPeople() {
+    if (capacity == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
     return
       Padding(
         padding: const EdgeInsets.only(top: 15),
@@ -472,7 +519,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
             hint: const Text("Select number of attendees"),
             value: numberOfPeople,
             items: List.generate(
-              20,
+              capacity!,
                   (index) => DropdownMenuItem(
                 value: index + 1,
                 child: Text("${index + 1}"),
@@ -489,6 +536,9 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
       );
   }
   Widget buildEquipment() {
+    if (equipment.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
     return SizedBox(
       height: 200,
       child: buildCard(
@@ -498,13 +548,12 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
           children: [
             Row(
               children: [
-                // Equipment list scrollable di kiri
                 Expanded(
                   child: SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     physics: const ClampingScrollPhysics(),
                     child: Row(
-                      children: equipments.map((equip) {
+                      children: equipment.map((equip) {
                         final isSelected = selectedEquipment.contains(equip);
                         return GestureDetector(
                           onTap: () {
@@ -527,7 +576,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(
-                                  equipmentIcons[equip],
+                                  equipmentIcons[equip] ?? Icons.device_unknown,
                                   size: 20,
                                   color: isSelected ? Colors.white : Colors.black87,
                                 ),
