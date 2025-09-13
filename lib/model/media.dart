@@ -9,16 +9,15 @@ class Media {
     required this.subLogoUrl,
   });
 
-  factory Media.fromFirestore(doc) {
-    final data = doc.data() as Map<String, dynamic>;
+  factory Media.fromJson(Map<String, dynamic> json) {
     return Media(
-      id: doc.id,
-      logoUrl: data['logoUrl'] ?? '',
-      subLogoUrl: data['subLogoUrl'] ?? '',
+      id: json['id'],
+      logoUrl: json['logoUrl'] ?? '',
+      subLogoUrl: json['subLogoUrl'] ?? '',
     );
   }
 
-  Map<String, dynamic> toMap() => {
+  Map<String, dynamic> toJson() => {
     'logoUrl': logoUrl,
     'subLogoUrl': subLogoUrl,
   };

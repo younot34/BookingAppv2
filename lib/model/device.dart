@@ -1,11 +1,9 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 class Device {
   final String id;
   final String deviceName;
   final String roomName;
   final String location;
-  final DateTime installDate;
+  final DateTime? installDate;
   final int capacity;
   final List<String> equipment;
   final bool isOn;
@@ -21,23 +19,22 @@ class Device {
     required this.isOn,
   });
 
-  factory Device.fromFirestore(doc) {
-    final data = doc.data() as Map<String, dynamic>;
+  factory Device.fromJson(Map<String, dynamic> json) {
     return Device(
-      id: doc.id,
-      deviceName: data['deviceName'] ?? '',
-      roomName: data['roomName'] ?? 'Unknown Room',
-      location: data['location'] ?? '',
-      installDate: data['installDate'] is Timestamp
-          ? (data['installDate'] as Timestamp).toDate()
-          : DateTime.now(),
-      capacity: data['capacity'] ?? 0,
-      equipment: List<String>.from(data['equipment'] ?? []),// fallback default
-      isOn: data['isOn'] ?? false,
+      id: json['id'],
+      deviceName: json['deviceName'] ?? '',
+      roomName: json['roomName'] ?? 'Unknown Room',
+      location: json['location'] ?? '',
+      installDate: json['install_date'] != null && json['install_date'] != ''
+          ? DateTime.tryParse(json['install_date'])
+          : null,
+      capacity: json['capacity'] ?? 0,
+      equipment: List<String>.from(json['equipment'] ?? []),// fallback default
+      isOn: json['isOn'] ?? false,
     );
   }
 
-  Map<String, dynamic> toMap() => {
+  Map<String, dynamic> toJson() => {
     'deviceName': deviceName,
     'roomName': roomName,
     'location': location,

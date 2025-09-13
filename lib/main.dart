@@ -16,8 +16,7 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
   final roomName = await RoomService.getOrRegisterRoom();
-  final deviceService = DeviceService();
-  await deviceService.setDeviceStatus(roomName, true);
+  await DeviceService.setDeviceStatus(roomName, true);
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: []);
   if (Platform.isWindows) {
     await setupWindow();

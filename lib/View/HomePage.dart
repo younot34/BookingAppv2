@@ -99,7 +99,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver{
         _updateBookingStatus();
       });
     });
-    _deviceService.setDeviceStatus(widget.roomName, true);
+    DeviceService.setDeviceStatus(widget.roomName, true);
   }
 
   void _listenBookings() {
@@ -114,7 +114,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver{
   }
 
   Future<void> _fetchDeviceData() async {
-    final device = await deviceService.getDeviceByRoom(widget.roomName);
+    final device = await DeviceService.getDeviceByRoom(widget.roomName);
     if (device != null) {
       setState(() {
         roomCapacity = device.capacity;
@@ -274,17 +274,17 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver{
     WidgetsBinding.instance.removeObserver(this);
     _timer.cancel();
     _bookingSubscription.cancel();
-    _deviceService.setDeviceStatus(widget.roomName, false);
+    DeviceService.setDeviceStatus(widget.roomName, false);
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _deviceService.setDeviceStatus(widget.roomName, true); // balik ON
+      DeviceService.setDeviceStatus(widget.roomName, true); // balik ON
     } else if (state == AppLifecycleState.detached ||
         state == AppLifecycleState.inactive) {
-      _deviceService.setDeviceStatus(widget.roomName, false); // jadi OFF
+      DeviceService.setDeviceStatus(widget.roomName, false); // jadi OFF
     }
   }
 

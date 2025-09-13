@@ -1,77 +1,65 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:testing/services/room_service.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import '../config/api_config.dart';
 import '../model/booking.dart';
 
 class BookingService {
-  final CollectionReference _collection =
-  FirebaseFirestore.instance.collection("bookings");
-  final CollectionReference _historyCollection =
-  FirebaseFirestore.instance.collection("history");
+  final String url = "${ApiConfig.baseUrl}/bookings";
 
-  // CREATE
-  Future<Booking> saveBooking(Booking booking) async {
-    final roomName = await RoomService.getOrRegisterRoom();
-    final newBooking = booking.copyWith(roomName: roomName);
-    final docRef = await _collection.add(booking.toMap());
-    await docRef.update({"id": docRef.id}); // simpan id di firestore juga
-    return booking.copyWith(id: docRef.id); // kembalikan booking dengan id terisi
+  Future<List<Booking>> getAllBookings() async {
+    final response = await http.get(Uri.parse(url));
+    if (response.statusCode == 200) {
+      final List data = jsonDecode(response.body);
+      return data.map((e) => Booking.fromJson(e)).toList();
+    }
+    throw Exception("Failed to fetch bookings");
   }
 
-  // READ (sekali ambil)
   Future<List<Booking>> getBookingsByRoom(String roomName) async {
-    final snapshot = await _collection
-        .where("roomName", isEqualTo: roomName)
-        .get();
-
-    return snapshot.docs.map((doc) => Booking.fromFirestore(doc)).toList();
+    final response = await http.get(Uri.parse("$url?room_name=$roomName"));
+    if (response.statusCode == 200) {
+      final List data = jsonDecode(response.body);
+      return data.map((e) => Booking.fromJson(e)).toList();
+    }
+    throw Exception("Failed to fetch bookings by room");
   }
 
-  // READ (stream realtime)
-  Stream<List<Booking>> streamBookingsByRoom(String roomName) {
-    return _collection
-        .where("roomName", isEqualTo: roomName)
-        .snapshots()
-        .map((snap) =>
-        snap.docs.map((doc) => Booking.fromFirestore(doc)).toList());
-  }
-  Stream<List<Booking>> streamBookingsForDevice() async* {
-    final roomName = await RoomService.getOrRegisterRoom();
-    yield* _collection
-        .where("roomName", isEqualTo: roomName)
-        .snapshots()
-        .map((snap) =>
-        snap.docs.map((doc) => Booking.fromFirestore(doc)).toList());
+  Stream<List<Booking>> streamBookingsByRoom(String roomName, {Duration interval = const Duration(seconds: 5)}) {
+    return Stream.periodic(interval).asyncMap((_) => getBookingsByRoom(roomName));
   }
 
-  // UPDATE
-  Future<void> updateBooking(Booking booking) async {
-    await _collection.doc(booking.id).update(booking.toMap());
+  Future<Booking> createBooking(Booking booking) async {
+    final response = await http.post(
+      Uri.parse(url),
+      headers: ApiConfig.headers,
+      body: jsonEncode(booking.toJson()),
+    );
+    if (response.statusCode == 201) {
+      return Booking.fromJson(jsonDecode(response.body));
+    }
+    throw Exception("Failed to create booking");
   }
 
-  // DELETE
-  Future<void> deleteBooking(String id) async {
-    await _collection.doc(id).delete();
+  Future<Booking> updateBooking(Booking booking) async {
+    final response = await http.put(
+      Uri.parse("$url/${booking.id}"),
+      headers: ApiConfig.headers,
+      body: jsonEncode(booking.toJson()),
+    );
+    if (response.statusCode == 200) {
+      return Booking.fromJson(jsonDecode(response.body));
+    }
+    throw Exception("Failed to update booking");
   }
 
-  // Future<void> moveToHistory(Booking booking) async {
-  //   try {
-  //     if (booking.id.isEmpty) {
-  //       print("Booking ID kosong, tidak bisa dipindah ke history.");
-  //       return;
-  //     }
-  //
-  //     print("🚀 Memindahkan booking '${booking.meetingTitle}' ke history...");
-  //
-  //     // Simpan booking ke collection history
-  //     await _historyCollection.doc(booking.id).set(booking.toMap());
-  //     print("✅ Booking tersimpan di history dengan ID: ${booking.id}");
-  //
-  //     // Hapus dari collection bookings
-  //     await _collection.doc(booking.id).delete();
-  //     print("🗑 Booking dihapus dari bookings.");
-  //
-  //   } catch (e) {
-  //     print("❌ Gagal memindahkan booking ke history: $e");
-  //   }
-  // }
+  Future<void> deleteBooking(int id) async {
+    final response = await http.delete(Uri.parse("$url/$id"));
+    if (response.statusCode != 204) {
+      throw Exception("Failed to delete booking");
+    }
+  }
+
+  Future<Booking> saveBooking(Booking booking) async {
+    return await createBooking(booking);
+  }
 }

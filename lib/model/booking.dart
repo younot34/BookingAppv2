@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 class Booking {
   final String id;  
   final String roomName;
@@ -26,7 +24,7 @@ class Booking {
     required this.meetingTitle,
     this.isScanEnabled = false,
     this.scanInfo,
-    this.status = "upcoming",
+    this.status = "In Queue",
   });
 
   factory Booking.newBooking({
@@ -56,7 +54,7 @@ class Booking {
     );
   }
 
-  Map<String, dynamic> toMap() {
+  Map<String, dynamic> toJson() {
     return {
       "roomName": roomName,
       "date": date,
@@ -72,21 +70,20 @@ class Booking {
     };
   }
 
-  factory Booking.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+  factory Booking.fromJson(Map<String, dynamic> json) {
     return Booking(
-      id: doc.id,
-      roomName: data["roomName"] ?? "",
-      date: data["date"] ?? "",
-      time: data["time"] ?? "",
-      duration: data["duration"],
-      numberOfPeople: data["numberOfPeople"],
-      equipment: List<String>.from(data["equipment"] ?? []),
-      hostName: data["hostName"] ?? "",
-      meetingTitle: data["meetingTitle"] ?? "",
-      isScanEnabled: data["isScanEnabled"] ?? false,
-      scanInfo: data["scanInfo"],
-      status: data["status"] ?? "upcoming",
+      id: json['id'].toString(),
+      roomName: json["roomName"] ?? "",
+      date: json["date"] ?? "",
+      time: json["time"] ?? "",
+      duration: json["duration"],
+      numberOfPeople: json["numberOfPeople"],
+      equipment: List<String>.from(json["equipment"] ?? []),
+      hostName: json["hostName"] ?? "",
+      meetingTitle: json["meetingTitle"] ?? "",
+      isScanEnabled: json["isScanEnabled"] ?? false,
+      scanInfo: json["scanInfo"],
+      status: json["status"] ?? "upcoming",
     );
   }
   Booking copyWith({

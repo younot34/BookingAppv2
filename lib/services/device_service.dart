@@ -1,26 +1,29 @@
 import 'dart:io';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 
+import '../Config/api_config.dart';
 import '../model/device.dart';
 
 class DeviceService {
-  final CollectionReference _collection =
-  FirebaseFirestore.instance.collection("devices");
   static const _deviceIdKey = "deviceId";
 
+  /// Ambil deviceId unik (disimpan di local storage)
   static Future<String> getDeviceId() async {
     final prefs = await SharedPreferences.getInstance();
-
     String? deviceId = prefs.getString(_deviceIdKey);
+
     if (deviceId != null) return deviceId;
 
-    deviceId = const Uuid().v4();
+    deviceId = const Uuid().v4(); // generate id unik
     await prefs.setString(_deviceIdKey, deviceId);
     return deviceId;
   }
+
+  /// Ambil nama device (misal: Samsung A7, iPhone 12)
   static Future<String> getDeviceName() async {
     final deviceInfo = DeviceInfoPlugin();
 
@@ -34,72 +37,71 @@ class DeviceService {
       return "Unknown Device";
     }
   }
-  Future<String> getLocation(String deviceName) async {
-    try {
-      final snapshot = await _collection
-          .where("name", isEqualTo: deviceName) // pastikan field "name" sama dengan nama device
-          .limit(1)
-          .get();
 
-      if (snapshot.docs.isNotEmpty) {
-        final data = snapshot.docs.first.data() as Map<String, dynamic>;
-        return data["location"] ?? "Unknown Location";
-      } else {
-        return "Unknown Location";
-      }
-    } catch (e) {
-      print("Failed to get location: $e");
-      return "Unknown Location";
+  /// Register device ke MySQL Laravel, atau ambil kalau sudah ada
+  static Future<String> registerOrGetRoom() async {
+    final deviceId = await getDeviceId();
+    final deviceName = await getDeviceName();
+
+    final response = await http.post(
+      Uri.parse("${ApiConfig.baseUrl}/devices/register-or-get"),
+      headers: ApiConfig.headers,
+      body: jsonEncode({
+        "device_id": deviceId,
+        "device_name": deviceName,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data['room_name'] ?? "Unknown Room";
+    } else {
+      throw Exception("Failed to register/get device");
     }
   }
 
-  Stream<String> streamDeviceLocation(String deviceName) {
-    return _collection
-        .where("name", isEqualTo: deviceName)
-        .limit(1)
-        .snapshots()
-        .map((snapshot) {
-      if (snapshot.docs.isNotEmpty) {
-        final data = snapshot.docs.first.data() as Map<String, dynamic>;
-        return data["location"] ?? "Unknown Location";
-      } else {
-        return "Unknown Location";
-      }
-    });
-  }
-  final CollectionReference devices =
-  FirebaseFirestore.instance.collection('devices');
-  Future<Device?> getDeviceByRoom(String roomName) async {
-    final snapshot = await devices
-        .where('roomName', isEqualTo: roomName)
-        .limit(1)
-        .get();
+  /// Ambil lokasi device (dari MySQL, bukan Firestore lagi)
+  static Future<String> getLocation(String deviceName) async {
+    final response = await http.get(
+      Uri.parse("${ApiConfig.baseUrl}/devices?device_name=$deviceName"),
+      headers: ApiConfig.headers,
+    );
 
-    if (snapshot.docs.isNotEmpty) {
-      return Device.fromFirestore(snapshot.docs.first);
+    if (response.statusCode == 200) {
+      final List devices = jsonDecode(response.body);
+      if (devices.isNotEmpty) {
+        return devices.first['location'] ?? "Unknown Location";
+      }
+    }
+    return "Unknown Location";
+  }
+
+  /// Update status device (isOn)
+  static Future<void> setDeviceStatus(String roomName, bool isOn) async {
+    final response = await http.put(
+      Uri.parse("${ApiConfig.baseUrl}/devices/$roomName"),
+      headers: ApiConfig.headers,
+      body: jsonEncode({"is_on": isOn}),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception("Failed to update device status");
+    }
+  }
+
+  /// Ambil device berdasarkan room
+  static Future<Device?> getDeviceByRoom(String roomName) async {
+    final response = await http.get(
+      Uri.parse("${ApiConfig.baseUrl}/devices?room_name=$roomName"),
+      headers: ApiConfig.headers,
+    );
+
+    if (response.statusCode == 200) {
+      final List devices = jsonDecode(response.body);
+      if (devices.isNotEmpty) {
+        return Device.fromJson(devices.first);
+      }
     }
     return null;
-  }
-  Future<void> setDeviceStatus(String roomName, bool isOn) async {
-    try {
-      final snapshot = await devices
-          .where('roomName', isEqualTo: roomName)
-          .limit(1)
-          .get();
-
-      if (snapshot.docs.isNotEmpty) {
-        final docId = snapshot.docs.first.id;
-        await devices.doc(docId).update({'isOn': isOn});
-      } else {
-        // Kalau device belum ada, buat baru
-        await devices.add({
-          'roomName': roomName,
-          'isOn': isOn,
-          'createdAt': FieldValue.serverTimestamp(),
-        });
-      }
-    } catch (e) {
-      print("Failed to update status: $e");
-    }
   }
 }
