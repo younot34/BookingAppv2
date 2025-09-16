@@ -3,22 +3,18 @@ class Media {
   final String logoUrl;
   final String subLogoUrl;
 
-  Media({
-    required this.id,
-    required this.logoUrl,
-    required this.subLogoUrl,
-  });
+  Media({required this.id, required this.logoUrl, required this.subLogoUrl});
 
   factory Media.fromJson(Map<String, dynamic> json) {
     return Media(
-      id: json['id'],
-      logoUrl: json['logoUrl'] ?? '',
-      subLogoUrl: json['subLogoUrl'] ?? '',
+      id: json['id'].toString(),
+      logoUrl: json['logo_url'] ?? '',
+      subLogoUrl: json['sub_logo_url'] ?? '',
     );
   }
 
   Map<String, dynamic> toJson() => {
-    'logoUrl': logoUrl,
-    'subLogoUrl': subLogoUrl,
+    'logo_url': logoUrl,
+    'sub_logo_url': subLogoUrl,
   };
 }

@@ -4,12 +4,25 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'package:device_info_plus/device_info_plus.dart';
-
 import '../Config/api_config.dart';
 import '../model/device.dart';
 
 class DeviceService {
+  final String url = "${ApiConfig.baseUrl}/devices";
   static const _deviceIdKey = "deviceId";
+
+  Future<List<Device>> getDevices() async {
+    final response = await http.get(Uri.parse(url));
+    if (response.statusCode == 200) {
+      final List data = jsonDecode(response.body);
+      return data.map((e) => Device.fromJson(e)).toList();
+    }
+    throw Exception("Failed to fetch devices");
+  }
+
+  Stream<List<Device>> getDevicesStream({Duration interval = const Duration(seconds: 2)}) {
+    return Stream.periodic(interval).asyncMap((_) => getDevices());
+  }
 
   /// Ambil deviceId unik (disimpan di local storage)
   static Future<String> getDeviceId() async {
@@ -18,7 +31,7 @@ class DeviceService {
 
     if (deviceId != null) return deviceId;
 
-    deviceId = const Uuid().v4(); // generate id unik
+    deviceId = const Uuid().v4();
     await prefs.setString(_deviceIdKey, deviceId);
     return deviceId;
   }
@@ -44,7 +57,7 @@ class DeviceService {
     final deviceName = await getDeviceName();
 
     final response = await http.post(
-      Uri.parse("${ApiConfig.baseUrl}/devices/register-or-get"),
+      Uri.parse("${ApiConfig.baseUrl}/devices/register"),
       headers: ApiConfig.headers,
       body: jsonEncode({
         "device_id": deviceId,
@@ -60,10 +73,10 @@ class DeviceService {
     }
   }
 
-  /// Ambil lokasi device (dari MySQL, bukan Firestore lagi)
-  static Future<String> getLocation(String deviceName) async {
+  /// Ambil lokasi device (dari MySQL)
+  static Future<String> getLocation(String roomName) async {
     final response = await http.get(
-      Uri.parse("${ApiConfig.baseUrl}/devices?device_name=$deviceName"),
+      Uri.parse("${ApiConfig.baseUrl}/devices?room_name=$roomName"),
       headers: ApiConfig.headers,
     );
 
@@ -77,14 +90,16 @@ class DeviceService {
   }
 
   /// Update status device (isOn)
-  static Future<void> setDeviceStatus(String roomName, bool isOn) async {
+  static Future<void> setDeviceStatusByRoom(String roomName, bool isOn) async {
     final response = await http.put(
-      Uri.parse("${ApiConfig.baseUrl}/devices/$roomName"),
+      Uri.parse("${ApiConfig.baseUrl}/devices/$roomName/status"),
       headers: ApiConfig.headers,
       body: jsonEncode({"is_on": isOn}),
     );
 
     if (response.statusCode != 200) {
+      print("Status code: ${response.statusCode}");
+      print("Response body: ${response.body}");
       throw Exception("Failed to update device status");
     }
   }

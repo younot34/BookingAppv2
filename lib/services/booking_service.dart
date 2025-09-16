@@ -6,17 +6,8 @@ import '../model/booking.dart';
 class BookingService {
   final String url = "${ApiConfig.baseUrl}/bookings";
 
-  Future<List<Booking>> getAllBookings() async {
-    final response = await http.get(Uri.parse(url));
-    if (response.statusCode == 200) {
-      final List data = jsonDecode(response.body);
-      return data.map((e) => Booking.fromJson(e)).toList();
-    }
-    throw Exception("Failed to fetch bookings");
-  }
-
   Future<List<Booking>> getBookingsByRoom(String roomName) async {
-    final response = await http.get(Uri.parse("$url?room_name=$roomName"));
+    final response = await http.get(Uri.parse("${ApiConfig.baseUrl}/bookings/room/$roomName"));
     if (response.statusCode == 200) {
       final List data = jsonDecode(response.body);
       return data.map((e) => Booking.fromJson(e)).toList();
@@ -37,6 +28,7 @@ class BookingService {
     if (response.statusCode == 201) {
       return Booking.fromJson(jsonDecode(response.body));
     }
+    print("JSON dikirim: ${booking.toJson()}");
     throw Exception("Failed to create booking");
   }
 
@@ -62,4 +54,18 @@ class BookingService {
   Future<Booking> saveBooking(Booking booking) async {
     return await createBooking(booking);
   }
+
+  Future<void> endBooking(int id) async {
+    final response = await http.post(
+      Uri.parse("${ApiConfig.baseUrl}/bookings/$id/end"),
+      headers: {'Accept': 'application/json'},
+    );
+
+    if (response.statusCode != 200) {
+      print("Failed to end booking, status: ${response.statusCode}, body: ${response.body}");
+      throw Exception("Failed to end booking");
+    }
+  }
+
+
 }

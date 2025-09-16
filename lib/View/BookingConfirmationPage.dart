@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../model/booking.dart';
 import '../services/booking_service.dart';
@@ -109,6 +108,7 @@ class BookingConfirmationPage extends StatelessWidget {
           ),
         ),
         backgroundColor: const Color(0xFF168757),
+        foregroundColor: Colors.white,
         elevation: 0,
       ),
       body: Container(

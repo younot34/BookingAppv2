@@ -6,17 +6,12 @@ import 'package:testing/services/device_service.dart';
 import 'package:testing/services/room_service.dart';
 import 'View/HomePage.dart';
 import 'package:window_manager/window_manager.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AndroidAlarmManager.initialize();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
   final roomName = await RoomService.getOrRegisterRoom();
-  await DeviceService.setDeviceStatus(roomName, true);
+  await DeviceService.setDeviceStatusByRoom(roomName, true);
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: []);
   if (Platform.isWindows) {
     await setupWindow();

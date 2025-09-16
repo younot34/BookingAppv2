@@ -1,8 +1,9 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 import '../model/booking.dart';
+import '../services/device_service.dart';
 import 'BookingConfirmationPage.dart';
 
 class RoomDetailPage extends StatefulWidget {
@@ -77,20 +78,24 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
     "Snack": Icons.fastfood,
     "Dokumen": Icons.folder,
   };
+
   List<String> get visibleTimes {
     final available = getAvailableTimes(selectedDate);
     final start = timePage * timesPerPage;
     final end = (start + timesPerPage) > available.length ? available.length : (start + timesPerPage);
     return available.sublist(start, end);
   }
+
   void nextPage() {
     if ((timePage + 1) * timesPerPage < times.length) {
       setState(() => timePage++);
     }
   }
+
   void previousPage() {
     if (timePage > 0) setState(() => timePage--);
   }
+
   @override
   void initState() {
     super.initState();
@@ -105,6 +110,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _getCalendarHeight());
     _loadDeviceData();
   }
+
   void _getCalendarHeight() {
     final renderBox = _calendarKey.currentContext?.findRenderObject() as RenderBox?;
     if (renderBox != null) {
@@ -113,6 +119,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
       });
     }
   }
+
   bool isSelectedTimeValid(String h, String m) {
     final selectedDur = int.tryParse(selectedDuration ?? '30') ?? 30;
     final checkTime = DateTime(
@@ -127,7 +134,8 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
     const minBufferMinutes = 30;
     if (widget.existingBookings != null) {
       for (var b in widget.existingBookings!) {
-        if (b.date == "${selectedDate.day}/${selectedDate.month}/${selectedDate.year}") {
+        final formattedDate = DateFormat('yyyy-MM-dd').format(selectedDate);
+        if (b.date == formattedDate) {
           final bookedParts = b.time.split(':');
           final bookedHour = int.parse(bookedParts[0]);
           final bookedMinute = int.parse(bookedParts[1]);
@@ -157,7 +165,8 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
       bool conflict = false;
       if (widget.existingBookings != null) {
         for (var b in widget.existingBookings!) {
-          if (b.date == "${date.day}/${date.month}/${date.year}") {
+          final formattedDate = DateFormat('yyyy-MM-dd').format(selectedDate);
+          if (b.date == formattedDate) {
             final bookedParts = b.time.split(':');
             final bookedHour = int.parse(bookedParts[0]);
             final bookedMinute = int.parse(bookedParts[1]);
@@ -183,26 +192,31 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
     }
     return available;
   }
-  Future<void> _loadDeviceData() async {
-    final snapshot = await FirebaseFirestore.instance
-        .collection('devices')
-        .where('roomName', isEqualTo: widget.roomName)
-        .limit(1)
-        .get();
 
-    if (snapshot.docs.isNotEmpty) {
-      final data = snapshot.docs.first.data();
-      setState(() {
-        capacity = data['capacity'];
-        equipment = List<String>.from(data['equipment'] ?? []);
-      });
-    }else {
+  // ================== Laravel Device Integration ==================
+  Future<void> _loadDeviceData() async {
+    try {
+      final data = await DeviceService.getDeviceByRoom(widget.roomName);
+      if (data != null) {
+        setState(() {
+          capacity = data.capacity ?? 0;
+          equipment = List<String>.from(data.equipment ?? []);
+        });
+      } else {
+        setState(() {
+          capacity = 0;
+          equipment = [];
+        });
+      }
+    } catch (e) {
+      print("Failed to load device: $e");
       setState(() {
         capacity = 0;
         equipment = [];
       });
     }
   }
+
   Future<String?> _showScanInfoDialog() async {
     final controller = TextEditingController(text: scanInfo);
     final result = await showDialog<String>(
@@ -218,14 +232,8 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
           ),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, null),
-            child: const Text("Cancel"),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, controller.text),
-            child: const Text("Save"),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context, null), child: const Text("Cancel")),
+          ElevatedButton(onPressed: () => Navigator.pop(context, controller.text), child: const Text("Save")),
         ],
       ),
     );
@@ -380,10 +388,11 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
       );
 
       availableDurations = durations.where((d) {
-        final checkEnd = checkTime.add(Duration(minutes: d));
         if (widget.existingBookings != null) {
+          final checkEnd = checkTime.add(Duration(minutes: d));
           for (var b in widget.existingBookings!) {
-            if (b.date == "${selectedDate.day}/${selectedDate.month}/${selectedDate.year}") {
+            final formattedDate = DateFormat('yyyy-MM-dd').format(selectedDate);
+            if (b.date == formattedDate) {
               final bookedParts = b.time.split(':');
               final bookedHour = int.parse(bookedParts[0]);
               final bookedMinute = int.parse(bookedParts[1]);
@@ -435,7 +444,9 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                     if (value == null) return;
                     setState(() {
                       selectedHour = value;
-                      if (selectedMinute != null) selectedTime = "$selectedHour:$selectedMinute";
+                      if (selectedMinute != null) {
+                        selectedTime = "$selectedHour:$selectedMinute";
+                      }
                     });
                   },
                 ),
@@ -457,7 +468,9 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                     if (value == null) return;
                     setState(() {
                       selectedMinute = value;
-                      if (selectedHour != null) selectedTime = "$selectedHour:$selectedMinute";
+                      if (selectedHour != null) {
+                        selectedTime = "$selectedHour:$selectedMinute";
+                      }
                     });
                   },
                 ),
@@ -686,7 +699,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
               ? () async {
             final booking = Booking.newBooking(
               roomName: widget.roomName,
-              date: "${selectedDate.day}/${selectedDate.month}/${selectedDate.year}",
+              date: DateFormat('yyyy-MM-dd').format(selectedDate),
               time: "$selectedHour:$selectedMinute",
               duration: selectedDuration,
               numberOfPeople: numberOfPeople,
@@ -755,6 +768,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
           ],
         ),
         backgroundColor: const Color(0xFF168757),
+        foregroundColor: Colors.white,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(12),
