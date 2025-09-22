@@ -246,8 +246,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver{
   }
 
 
-  String get formattedTime => DateFormat('hh:mm a').format(_currentTime);
-  String get formattedDate => DateFormat('MMMM d, y').format(_currentTime);
+  String get formattedTime => DateFormat('HH:mm', 'id_ID').format(_currentTime);
+  String get formattedDate => DateFormat('EEEE, MMMM d, y').format(_currentTime);
 
   void _openRoomDetail({bool meetNow = false}) async {
     DateTime? meetNowDate;
@@ -329,7 +329,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver{
                               formattedTime,
                               key: ValueKey<String>(formattedTime),
                               style: const TextStyle(
-                                fontSize: 80,
+                                fontSize: 100,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.white,
                               ),

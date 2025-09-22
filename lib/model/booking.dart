@@ -57,23 +57,11 @@ class Booking {
   }
 
   Map<String, dynamic> toJson() {
-    String fixedTime = time.contains(":") && time.split(":").length == 2
-        ? "$time:00"
-        : time;
-
-    // ubah date menjadi YYYY-MM-DD dengan 2 digit untuk bulan & hari
-    List<String> parts = date.contains("/") ? date.split("/") : date.split("-");
-    // jika format awal dd/mm/yyyy
-    String day = parts[0].padLeft(2, '0');
-    String month = parts[1].padLeft(2, '0');
-    String year = parts[2];
-
-    String fixedDate = "$year-$month-$day";
 
     return {
       'room_name': roomName,
-      'date': fixedDate,
-      'time': fixedTime,
+      'date': date,
+      'time': time,
       'duration': duration,
       'number_of_people': numberOfPeople,
       'equipment': equipment,

@@ -11,7 +11,6 @@ class RoomDetailPage extends StatefulWidget {
   final List<Booking>? existingBookings;
   final bool isMeetNow;
   final DateTime? meetNowDate;
-
   const RoomDetailPage({
     super.key,
     required this.roomName,
@@ -19,11 +18,9 @@ class RoomDetailPage extends StatefulWidget {
     this.isMeetNow = false,
     this.meetNowDate,
   });
-
   @override
   State<RoomDetailPage> createState() => _RoomDetailPageState();
 }
-
 class _RoomDetailPageState extends State<RoomDetailPage> {
   bool isScanEnabled = false;
   String? scanInfo;
@@ -78,27 +75,24 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
     "Snack": Icons.fastfood,
     "Dokumen": Icons.folder,
   };
-
   List<String> get visibleTimes {
     final available = getAvailableTimes(selectedDate);
     final start = timePage * timesPerPage;
     final end = (start + timesPerPage) > available.length ? available.length : (start + timesPerPage);
     return available.sublist(start, end);
   }
-
   void nextPage() {
     if ((timePage + 1) * timesPerPage < times.length) {
       setState(() => timePage++);
     }
   }
-
   void previousPage() {
     if (timePage > 0) setState(() => timePage--);
   }
-
   @override
   void initState() {
     super.initState();
+    times = List.generate(24, (h) => List.generate(60, (m) => '${h.toString().padLeft(2,'0')}:${m.toString().padLeft(2,'0')}')).expand((e) => e).toList();
     hours = List.generate(24, (i) => i.toString().padLeft(2, '0'));
     minutes = List.generate(60, (i) => i.toString().padLeft(2, '0'));
     if (widget.isMeetNow && widget.meetNowDate != null) {
@@ -110,7 +104,6 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _getCalendarHeight());
     _loadDeviceData();
   }
-
   void _getCalendarHeight() {
     final renderBox = _calendarKey.currentContext?.findRenderObject() as RenderBox?;
     if (renderBox != null) {
@@ -119,7 +112,6 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
       });
     }
   }
-
   bool isSelectedTimeValid(String h, String m) {
     final selectedDur = int.tryParse(selectedDuration ?? '30') ?? 30;
     final checkTime = DateTime(
@@ -130,21 +122,29 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
       int.parse(m),
     );
     final checkEnd = checkTime.add(Duration(minutes: selectedDur));
+
     if (checkTime.isBefore(DateTime.now())) return false;
+
     const minBufferMinutes = 30;
+
     if (widget.existingBookings != null) {
       for (var b in widget.existingBookings!) {
-        final formattedDate = DateFormat('yyyy-MM-dd').format(selectedDate);
-        if (b.date == formattedDate) {
+        // Parsing string dari MySQL (yyyy-MM-dd)
+        final bookedDate = DateTime.parse(b.date);
+        if (bookedDate.year == selectedDate.year &&
+            bookedDate.month == selectedDate.month &&
+            bookedDate.day == selectedDate.day) {
           final bookedParts = b.time.split(':');
           final bookedHour = int.parse(bookedParts[0]);
           final bookedMinute = int.parse(bookedParts[1]);
           final bookedDur = int.tryParse(b.duration ?? '30') ?? 30;
-          final bookedStart = DateTime(selectedDate.year, selectedDate.month, selectedDate.day, bookedHour, bookedMinute);
+          final bookedStart = DateTime(
+              selectedDate.year, selectedDate.month, selectedDate.day, bookedHour, bookedMinute);
           final bookedEnd = bookedStart.add(Duration(minutes: bookedDur));
-          // buffer sebelum & sesudah booking
+
           final bufferStart = bookedStart.subtract(const Duration(minutes: minBufferMinutes));
           final bufferEnd = bookedEnd.add(const Duration(minutes: minBufferMinutes));
+
           if (checkTime.isBefore(bufferEnd) && checkEnd.isAfter(bufferStart)) {
             return false;
           }
@@ -156,29 +156,41 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
   List<String> getAvailableTimes(DateTime date) {
     final now = DateTime.now();
     List<String> available = [];
+
+    if (times.isEmpty) return available;
+
+    const minBufferMinutes = 30;
+
     for (var t in times) {
       final parts = t.split(':');
       final hour = int.parse(parts[0]);
       final minute = int.parse(parts[1]);
       final checkTime = DateTime(date.year, date.month, date.day, hour, minute);
+
       if (checkTime.isBefore(now)) continue;
+
       bool conflict = false;
+
       if (widget.existingBookings != null) {
         for (var b in widget.existingBookings!) {
-          final formattedDate = DateFormat('yyyy-MM-dd').format(selectedDate);
-          if (b.date == formattedDate) {
+          final bookedDate = DateTime.parse(b.date);
+          if (bookedDate.year == date.year &&
+              bookedDate.month == date.month &&
+              bookedDate.day == date.day) {
+
             final bookedParts = b.time.split(':');
             final bookedHour = int.parse(bookedParts[0]);
             final bookedMinute = int.parse(bookedParts[1]);
-            final duration = int.tryParse(b.duration ?? '30') ?? 30;
+            final bookedDur = int.tryParse(b.duration ?? '30') ?? 30;
             final bookedStart = DateTime(date.year, date.month, date.day, bookedHour, bookedMinute);
-            final bookedEnd = bookedStart.add(Duration(minutes: duration));
+            final bookedEnd = bookedStart.add(Duration(minutes: bookedDur));
 
-            // buffer sebelum & sesudah booking
-            final bufferStart = bookedStart.subtract(const Duration(minutes: 30));
-            final bufferEnd = bookedEnd.add(const Duration(minutes: 30));
+            final bufferStart = bookedStart.subtract(const Duration(minutes: minBufferMinutes));
+            final bufferEnd = bookedEnd.add(const Duration(minutes: minBufferMinutes));
 
-            if (checkTime.isAfter(bufferStart) && checkTime.isBefore(bufferEnd)) {
+            final checkEnd = checkTime.add(const Duration(minutes: 30));
+
+            if (checkTime.isBefore(bufferEnd) && checkEnd.isAfter(bufferStart)) {
               conflict = true;
               break;
             }
@@ -190,10 +202,9 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
         available.add(t);
       }
     }
+
     return available;
   }
-
-  // ================== Laravel Device Integration ==================
   Future<void> _loadDeviceData() async {
     try {
       final data = await DeviceService.getDeviceByRoom(widget.roomName);
@@ -216,7 +227,6 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
       });
     }
   }
-
   Future<String?> _showScanInfoDialog() async {
     final controller = TextEditingController(text: scanInfo);
     final result = await showDialog<String>(
@@ -357,6 +367,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
   double timesDurationSpacing = 18;
   Widget buildTimesAndDuration() {
     List<int> availableDurations = durations;
+    // Handle Meet Now dan nearest booking
     if (widget.isMeetNow && widget.meetNowDate != null && widget.existingBookings != null) {
       final now = widget.meetNowDate!;
       DateTime? nearestBooking;
@@ -376,8 +387,11 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
         availableDurations = durations.where((d) => d <= diffMinutes).toList();
       }
     }
+
     final hours = List.generate(24, (i) => i.toString().padLeft(2, '0'));
     final minutes = List.generate(60, (i) => i.toString().padLeft(2, '0'));
+
+    // Filter durasi berdasarkan waktu yang dipilih
     if (selectedHour != null && selectedMinute != null) {
       final checkTime = DateTime(
         selectedDate.year,
@@ -388,11 +402,14 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
       );
 
       availableDurations = durations.where((d) {
+        final checkEnd = checkTime.add(Duration(minutes: d));
         if (widget.existingBookings != null) {
-          final checkEnd = checkTime.add(Duration(minutes: d));
           for (var b in widget.existingBookings!) {
-            final formattedDate = DateFormat('yyyy-MM-dd').format(selectedDate);
-            if (b.date == formattedDate) {
+            final bookedDate = DateTime.parse(b.date);
+            if (bookedDate.year == selectedDate.year &&
+                bookedDate.month == selectedDate.month &&
+                bookedDate.day == selectedDate.day) {
+
               final bookedParts = b.time.split(':');
               final bookedHour = int.parse(bookedParts[0]);
               final bookedMinute = int.parse(bookedParts[1]);
@@ -400,7 +417,10 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
               final bookedStart = DateTime(selectedDate.year, selectedDate.month, selectedDate.day, bookedHour, bookedMinute);
               final bookedEnd = bookedStart.add(Duration(minutes: bookedDur));
 
-              if (checkTime.isBefore(bookedEnd) && checkEnd.isAfter(bookedStart)) {
+              final bufferStart = bookedStart.subtract(Duration(minutes: 30));
+              final bufferEnd = bookedEnd.add(Duration(minutes: 30));
+
+              if (checkTime.isBefore(bufferEnd) && checkEnd.isAfter(bufferStart)) {
                 return false;
               }
             }
@@ -409,8 +429,10 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
         return true;
       }).toList();
     }
+
     return Column(
       children: [
+        // Dropdown Jam & Menit
         buildCard(
           title: "Select Time",
           child: widget.isMeetNow
@@ -444,9 +466,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                     if (value == null) return;
                     setState(() {
                       selectedHour = value;
-                      if (selectedMinute != null) {
-                        selectedTime = "$selectedHour:$selectedMinute";
-                      }
+                      if (selectedMinute != null) selectedTime = "$selectedHour:$selectedMinute";
                     });
                   },
                 ),
@@ -468,9 +488,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                     if (value == null) return;
                     setState(() {
                       selectedMinute = value;
-                      if (selectedHour != null) {
-                        selectedTime = "$selectedHour:$selectedMinute";
-                      }
+                      if (selectedHour != null) selectedTime = "$selectedHour:$selectedMinute";
                     });
                   },
                 ),
@@ -479,6 +497,8 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
           ),
         ),
         const SizedBox(height: 25),
+
+        // Pilih Durasi
         if (selectedTime != null || widget.isMeetNow) ...[
           buildCard(
             title: "Select Duration (minutes)",

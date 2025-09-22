@@ -6,6 +6,7 @@ import 'package:testing/services/device_service.dart';
 import 'package:testing/services/room_service.dart';
 import 'View/HomePage.dart';
 import 'package:window_manager/window_manager.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -16,6 +17,7 @@ Future<void> main() async {
   if (Platform.isWindows) {
     await setupWindow();
   }
+  await initializeDateFormatting('id_ID', null);
   await AndroidAlarmManager.oneShot(
     const Duration(seconds: 5),
     0, // alarm ID
