@@ -39,6 +39,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver{
   String? roomLocation;
   String? logoUrlMain;
   String? logoUrlSub;
+  String roomStatus = "AVAILABLE";
   final DeviceService _deviceService = DeviceService();
 
   Future<void> _loadMediaLogos() async {
@@ -195,17 +196,30 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver{
   }
 
   void _updateAvailability() {
-    isAvailable = true;
-    for (var b in bookings) {
-      final start = parseBookingDateTimeSafe(b.date, b.time);
-      final dur = int.tryParse(b.duration ?? '30') ?? 30;
-      final end = start.add(Duration(minutes: dur));
-      if (_currentTime.isAfter(start) && _currentTime.isBefore(end)) {
-        isAvailable = false;
-        break;
-      }
+  roomStatus = "AVAILABLE"; // default
+  isAvailable = true;
+  final now = _currentTime;
+
+  for (var b in bookings) {
+    final start = parseBookingDateTimeSafe(b.date, b.time);
+    final dur = int.tryParse(b.duration ?? '30') ?? 30;
+    final end = start.add(Duration(minutes: dur));
+
+    final diff = start.difference(now).inMinutes;
+
+    if (now.isAfter(start) && now.isBefore(end)) {
+      // sudah mulai meeting
+      roomStatus = "NOT AVAILABLE";
+      isAvailable = false;
+      break;
+    } else if (diff > 0 && diff <= 30) {
+      // kurang dari 30 menit sebelum mulai
+      roomStatus = "WAITING FOR NEXT MEETING";
+      isAvailable = true;
+      break;
     }
   }
+}
 
   void _updateBookingStatus() async {
     final now = DateTime.now();
@@ -349,13 +363,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver{
                               transitionBuilder: (child, animation) {
                                 return ScaleTransition(scale: animation, child: child);
                               },
-                              child:
-                              Stack(
-                                key: ValueKey<bool>(isAvailable),
+                              child: Stack(
+                                key: ValueKey<String>(roomStatus),
                                 children: [
                                   // Stroke
                                   Text(
-                                    isAvailable ? "AVAILABLE" : "NOT AVAILABLE",
+                                    roomStatus,
                                     style: TextStyle(
                                       fontSize: 66,
                                       fontWeight: FontWeight.bold,
@@ -367,15 +380,19 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver{
                                   ),
                                   // Fill
                                   Text(
-                                    isAvailable ? "AVAILABLE" : "NOT AVAILABLE",
+                                    roomStatus,
                                     style: TextStyle(
                                       fontSize: 66,
                                       fontWeight: FontWeight.bold,
-                                      color: isAvailable ? Colors.green[900] : Colors.red[900],
+                                      color: roomStatus == "AVAILABLE"
+                                          ? Colors.green[900]
+                                          : roomStatus == "WAITING FOR NEXT MEETING"
+                                              ? const Color.fromARGB(255, 245, 197, 23)
+                                              : Colors.red[900],
                                     ),
                                   ),
                                 ],
-                              )
+                              ),
                             ),
                           ],
                         ),
