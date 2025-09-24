@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:testing/services/elc_service.dart';
 import 'package:window_manager/window_manager.dart';
 import '../model/booking.dart';
 import '../services/booking_service.dart';
@@ -196,31 +197,35 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver{
   }
 
   void _updateAvailability() {
-  roomStatus = "AVAILABLE"; // default
-  isAvailable = true;
-  final now = _currentTime;
+    roomStatus = "AVAILABLE"; // default
+    isAvailable = true;
+    final now = _currentTime;
 
-  for (var b in bookings) {
-    final start = parseBookingDateTimeSafe(b.date, b.time);
-    final dur = int.tryParse(b.duration ?? '30') ?? 30;
-    final end = start.add(Duration(minutes: dur));
+    for (var b in bookings) {
+      final start = parseBookingDateTimeSafe(b.date, b.time);
+      final dur = int.tryParse(b.duration ?? '30') ?? 30;
+      final end = start.add(Duration(minutes: dur));
 
-    final diff = start.difference(now).inMinutes;
+      final diff = start.difference(now).inMinutes;
 
-    if (now.isAfter(start) && now.isBefore(end)) {
-      // sudah mulai meeting
-      roomStatus = "NOT AVAILABLE";
-      isAvailable = false;
-      break;
-    } else if (diff > 0 && diff <= 30) {
-      // kurang dari 30 menit sebelum mulai
-      roomStatus = "WAITING FOR NEXT MEETING";
-      isAvailable = true;
-      break;
+      if (now.isAfter(start) && now.isBefore(end)) {
+        // sedang dipakai → NOT AVAILABLE
+        roomStatus = "NOT AVAILABLE";
+        isAvailable = false;
+        ElcService.setLedRed(); // 🔴 LED merah
+        return;
+      } else if (diff > 0 && diff <= 30) {
+        // 30 menit sebelum meeting → WAITING
+        roomStatus = "WAITING FOR NEXT MEETING";
+        isAvailable = true;
+        ElcService.setLedYellow(); // 🟡 LED kuning
+        return;
+      }
     }
-  }
-}
 
+    // default kalau kosong → AVAILABLE
+    ElcService.setLedGreen(); // 🟢 LED hijau
+  }
   void _updateBookingStatus() async {
     final now = DateTime.now();
 
@@ -244,7 +249,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver{
       }
     }
   }
-
 
   Booking? get currentMeeting {
     for (var b in bookings) {
