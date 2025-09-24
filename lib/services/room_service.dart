@@ -6,7 +6,7 @@ import 'device_service.dart';
 class RoomService {
   static Future<String> getOrRegisterRoom() async {
     final deviceId = await DeviceService.getDeviceId();
-    final deviceName = await DeviceService.getDeviceName(); // ✅ tambahkan
+    final deviceName = await DeviceService.getDeviceName();
 
     final response = await http.post(
       Uri.parse("${ApiConfig.baseUrl}/devices/register"),

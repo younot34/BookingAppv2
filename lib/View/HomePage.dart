@@ -197,34 +197,42 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver{
   }
 
   void _updateAvailability() {
-    roomStatus = "AVAILABLE"; // default
-    isAvailable = true;
     final now = _currentTime;
+    String newStatus = "AVAILABLE";
+    bool available = true;
 
     for (var b in bookings) {
       final start = parseBookingDateTimeSafe(b.date, b.time);
+      if (start == null) continue;
+
       final dur = int.tryParse(b.duration ?? '30') ?? 30;
       final end = start.add(Duration(minutes: dur));
-
       final diff = start.difference(now).inMinutes;
 
       if (now.isAfter(start) && now.isBefore(end)) {
-        // sedang dipakai → NOT AVAILABLE
-        roomStatus = "NOT AVAILABLE";
-        isAvailable = false;
-        ElcService.setLedRed(); // 🔴 LED merah
-        return;
+        newStatus = "NOT AVAILABLE";
+        available = false;
+
+        if (mounted) Future.microtask(() => ElcService.ledOff());
+        break;
       } else if (diff > 0 && diff <= 30) {
-        // 30 menit sebelum meeting → WAITING
-        roomStatus = "WAITING FOR NEXT MEETING";
-        isAvailable = true;
-        ElcService.setLedYellow(); // 🟡 LED kuning
-        return;
+        newStatus = "WAITING FOR NEXT MEETING";
+        available = true;
+
+        if (mounted) Future.microtask(() => ElcService.seekStart());
+        break;
       }
     }
 
-    // default kalau kosong → AVAILABLE
-    ElcService.setLedGreen(); // 🟢 LED hijau
+    if (mounted) {
+      setState(() {
+        roomStatus = newStatus;
+        isAvailable = available;
+      });
+
+      // Default kalau kosong
+      if (newStatus == "AVAILABLE") Future.microtask(() => ElcService.ledSeek());
+    }
   }
   void _updateBookingStatus() async {
     final now = DateTime.now();
