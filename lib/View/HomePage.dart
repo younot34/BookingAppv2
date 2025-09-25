@@ -81,17 +81,20 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver{
     _listenBookings();
     _fetchDeviceData();
     _loadMediaLogos();
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _updateLeftCardHeight();
-    });
-
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      setState(() {
-        _currentTime = DateTime.now();
-        _updateAvailability();
-        _updateBookingStatus();
+      Future.microtask(() => ElcService.ledSeek(1, 255));
+      _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        setState(() {
+          _currentTime = DateTime.now();
+          _updateAvailability();
+          _updateBookingStatus();
+        });
       });
     });
+
+
     DeviceService.registerOrGetRoom().then((roomName) {
       DeviceService.setDeviceStatusByRoom(roomName, true);
     });
@@ -140,7 +143,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver{
 
   Future<void> _fetchDeviceData() async {
     final device = await DeviceService.getDeviceByRoom(widget.roomName);
+    print("Fetched device: $device");
     if (device != null) {
+      print("Capacity: ${device.capacity}, Location: ${device.location}");
       setState(() {
         roomCapacity = device.capacity;
         roomLocation = device.location;
@@ -204,22 +209,21 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver{
     for (var b in bookings) {
       final start = parseBookingDateTimeSafe(b.date, b.time);
       if (start == null) continue;
-
       final dur = int.tryParse(b.duration ?? '30') ?? 30;
       final end = start.add(Duration(minutes: dur));
       final diff = start.difference(now).inMinutes;
 
       if (now.isAfter(start) && now.isBefore(end)) {
+        // 🔴 Meeting berlangsung → Merah
         newStatus = "NOT AVAILABLE";
         available = false;
-
-        if (mounted) Future.microtask(() => ElcService.ledOff());
+        if (mounted) Future.microtask(() => ElcService.ledSeek(3, 1));
         break;
       } else if (diff > 0 && diff <= 30) {
+        // 🟡 Menunggu meeting → Kuning
         newStatus = "WAITING FOR NEXT MEETING";
         available = true;
-
-        if (mounted) Future.microtask(() => ElcService.seekStart());
+        if (mounted) Future.microtask(() => ElcService.ledSeek(2, 1));
         break;
       }
     }
@@ -230,8 +234,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver{
         isAvailable = available;
       });
 
-      // Default kalau kosong
-      if (newStatus == "AVAILABLE") Future.microtask(() => ElcService.ledSeek());
+      // 🟢 Default kalau kosong → Hijau
+      if (newStatus == "AVAILABLE") {
+        Future.microtask(() => ElcService.ledSeek(1, 1));
+      }
     }
   }
   void _updateBookingStatus() async {

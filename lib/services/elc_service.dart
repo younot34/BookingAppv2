@@ -1,37 +1,24 @@
 import 'package:flutter/services.dart';
 
 class ElcService {
-  static const _channel = MethodChannel('com.example.testing/elcapi');
+  static const platform = MethodChannel('com.example.elcapi');
 
-  static Future<void> ledOff() async {
-    try {
-      await _channel.invokeMethod('ledOff');
-    } catch (e) {
-      print("Error ledOff: $e");
-    }
+  // Sesuai native method
+  static Future<int?> ledSeek(int i, int i2) async {
+    return await platform.invokeMethod('ledSeek', {"i": i, "i2": i2});
   }
 
-  static Future<void> ledSeek() async {
-    try {
-      await _channel.invokeMethod('ledSeek');
-    } catch (e) {
-      print("Error ledSeek: $e");
-    }
+  static Future<int?> seekStart() async {
+    return await platform.invokeMethod('seekStart');
   }
 
-  static Future<void> seekStart() async {
-    try {
-      await _channel.invokeMethod('seekStart');
-    } catch (e) {
-      print("Error seekStart: $e");
-    }
+  static Future<int?> seekStop() async {
+    return await platform.invokeMethod('seekStop');
   }
 
-  static Future<void> seekStop() async {
-    try {
-      await _channel.invokeMethod('seekStop');
-    } catch (e) {
-      print("Error seekStop: $e");
-    }
+  // Kalau mau ada "ledOff", kamu bisa bikin shortcut sendiri
+  static Future<int?> ledOff() async {
+    // Misal kita asumsikan ledOff = seekStop()
+    return await seekStop();
   }
 }

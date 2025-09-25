@@ -1,13 +1,13 @@
 package com.example.testing
-import com.example.elcapi.Jnielc
 
+import com.example.elcapi.jnielc
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity: FlutterActivity() {
 
-    private val CHANNEL = "com.example.testing/elcapi"
+    private val CHANNEL = "com.example.elcapi"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -15,21 +15,19 @@ class MainActivity: FlutterActivity() {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             try {
                 when (call.method) {
-                    "ledOff" -> {
-                        Jnielc.ledoff()
-                        result.success(null)
-                    }
                     "ledSeek" -> {
-                        Jnielc.ledseek()
-                        result.success(null)
+                        val arg1 = call.argument<Int>("i") ?: 0
+                        val arg2 = call.argument<Int>("i2") ?: 0
+                        val res = jnielc.ledseek(arg1, arg2)
+                        result.success(res)
                     }
                     "seekStart" -> {
-                        Jnielc.seekstart()
-                        result.success(null)
+                        val res = jnielc.seekstart()
+                        result.success(res)
                     }
                     "seekStop" -> {
-                        Jnielc.seekstop()
-                        result.success(null)
+                        val res = jnielc.seekstop()
+                        result.success(res)
                     }
                     else -> result.notImplemented()
                 }
