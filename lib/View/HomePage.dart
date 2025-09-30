@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
-import 'package:testing/services/elc_service.dart';
 import 'package:window_manager/window_manager.dart';
 import '../model/booking.dart';
 import '../services/booking_service.dart';
@@ -84,7 +83,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver{
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _updateLeftCardHeight();
-      Future.microtask(() => ElcService.ledSeek(1, 255));
       _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
         setState(() {
           _currentTime = DateTime.now();
@@ -202,42 +200,35 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver{
   }
 
   void _updateAvailability() {
-    final now = _currentTime;
+    final now = DateTime.now();
     String newStatus = "AVAILABLE";
     bool available = true;
 
     for (var b in bookings) {
       final start = parseBookingDateTimeSafe(b.date, b.time);
-      if (start == null) continue;
       final dur = int.tryParse(b.duration ?? '30') ?? 30;
       final end = start.add(Duration(minutes: dur));
-      final diff = start.difference(now).inMinutes;
 
       if (now.isAfter(start) && now.isBefore(end)) {
-        // 🔴 Meeting berlangsung → Merah
-        newStatus = "NOT AVAILABLE";
+        newStatus = "UNAVAILABLE";
         available = false;
-        if (mounted) Future.microtask(() => ElcService.ledSeek(3, 1));
         break;
-      } else if (diff > 0 && diff <= 30) {
-        // 🟡 Menunggu meeting → Kuning
-        newStatus = "WAITING FOR NEXT MEETING";
-        available = true;
-        if (mounted) Future.microtask(() => ElcService.ledSeek(2, 1));
+      } else if (now.isBefore(start) &&
+          now.isAfter(start.subtract(const Duration(minutes: 10)))) {
+        newStatus = "WAITING";
+        available = false;
         break;
       }
     }
 
-    if (mounted) {
+    if (available) {
+      newStatus = "AVAILABLE";
+    }
+
+    if (roomStatus != newStatus) {
       setState(() {
         roomStatus = newStatus;
-        isAvailable = available;
       });
-
-      // 🟢 Default kalau kosong → Hijau
-      if (newStatus == "AVAILABLE") {
-        Future.microtask(() => ElcService.ledSeek(1, 1));
-      }
     }
   }
   void _updateBookingStatus() async {
@@ -343,7 +334,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver{
                   image: const AssetImage("assets/mountain.png"),
                   fit: BoxFit.cover,
                   colorFilter: ColorFilter.mode(
-                    isAvailable ? const Color(0xAA168757) : const Color(0xAAA80000),
+                    roomStatus == "AVAILABLE"
+                        ? const Color(0xAA168757) // hijau
+                        : roomStatus == "WAITING FOR NEXT MEETING"
+                        ? const Color(0xAAFFC107) // kuning
+                        : const Color(0xAAA80000), // merah
                     BlendMode.srcOver,
                   ),
                 ),
@@ -405,8 +400,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver{
                                       color: roomStatus == "AVAILABLE"
                                           ? Colors.green[900]
                                           : roomStatus == "WAITING FOR NEXT MEETING"
-                                              ? const Color.fromARGB(255, 245, 197, 23)
-                                              : Colors.red[900],
+                                          ? const Color.fromARGB(255, 245, 197, 23)
+                                          : Colors.red[900],
                                     ),
                                   ),
                                 ],
@@ -587,27 +582,27 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver{
                         radius: 40,
                         backgroundColor: Colors.grey[800],
                         child: ClipOval(
-                          child:
-                          LogoWidget(
-                            imageUrlOrBase64: logoUrlMain,
-                            width: 70,
-                            height: 70,
-                            onTap: () async {
-                              _logoTapCount++;
-                              _tapResetTimer?.cancel();
-                              _tapResetTimer = Timer(const Duration(seconds: 2), () {
-                                _logoTapCount = 0;
-                              });
-                              if (_logoTapCount >= 10) {
-                                _logoTapCount = 0;
+                            child:
+                            LogoWidget(
+                              imageUrlOrBase64: logoUrlMain,
+                              width: 70,
+                              height: 70,
+                              onTap: () async {
+                                _logoTapCount++;
                                 _tapResetTimer?.cancel();
-                                await _disableKioskMode();
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text("App unpinned")),
-                                );
-                              }
-                            },
-                          )
+                                _tapResetTimer = Timer(const Duration(seconds: 2), () {
+                                  _logoTapCount = 0;
+                                });
+                                if (_logoTapCount >= 10) {
+                                  _logoTapCount = 0;
+                                  _tapResetTimer?.cancel();
+                                  await _disableKioskMode();
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text("App unpinned")),
+                                  );
+                                }
+                              },
+                            )
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -813,10 +808,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver{
                                                     margin: const EdgeInsets.symmetric(vertical: 2, horizontal: 6),
                                                     child: ListTile(
                                                       title: Text("Host: ${b.hostName}",
-                                                          style: const TextStyle(fontWeight: FontWeight.bold ,color: Colors.black),
+                                                        style: const TextStyle(fontWeight: FontWeight.bold ,color: Colors.black),
                                                       ),
                                                       subtitle: Text(
-                                                          formatBookingTime(b.time, b.date, b.duration),
+                                                        formatBookingTime(b.time, b.date, b.duration),
                                                         style: const TextStyle(color: Colors.black),
                                                       ),
                                                       trailing: Row(
